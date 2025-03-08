@@ -1,11 +1,18 @@
 from datetime import timedelta
 from typing import Callable, Optional
 from aalb import AALeaderboard
-from twitchio import Chatter, Message, PartialChatter
+# from twitchio import Chatter, Message, PartialChatter
 from twitchio.ext import commands
 from daemon import data_dir, datafile, seconds_since_update, duration_since_update
 from query import DATA, PacemanObject, DATA_SORTED, ALL_SPLITS, USEFUL_DATA, td
 from sys import argv
+import auth
+from twitchio import eventsub, web
+import twitchio
+from string import printable
+
+
+REAL_CHARS=set(printable)
 
 
 async def do_send(ctx: commands.Context, s: str):
@@ -99,7 +106,6 @@ class Bot(commands.Bot):
     def __init__(self, prefix='?'):
         import json
         self.prefix = prefix
-        self.aaleaderboard = AALeaderboard()
         default_configuration = """
         {
             "folderbot": {
@@ -125,7 +131,46 @@ class Bot(commands.Bot):
         """
         self.configuration: dict[str, dict] = json.loads(default_file(datafile("folderbot.json"), default_configuration))
 
-        super().__init__(token=open('auth/ttg-access.txt').read().strip(), prefix=prefix, initial_channels=[k for k in self.configuration.keys()])
+        adapter = web.AiohttpAdapter(domain="folderbot.disrespec.tech", port=8009)
+        super().__init__(**auth.client_auth(), prefix=prefix, adapter=adapter)
+
+    async def join_channel(self, chan: str):
+        subscription = eventsub.ChatMessageSubscription(broadcaster_user_id=chan, user_id='263137120')
+        await self.subscribe_websocket(payload=subscription)
+
+    async def setup_hook(self):
+        for k, v in self.configuration.items():
+            if "cid" in v:
+                await self.join_channel(v["cid"])
+            else:
+                print('cannot join channel', k, "because we have no cid")
+
+        await self.add_component(SimpleCommands(self))
+
+    async def add_token(self, token: str, refresh: str) -> twitchio.authentication.ValidateTokenPayload:
+        # Make sure to call super() as it will add the tokens interally and return us some data...
+        resp: twitchio.authentication.ValidateTokenPayload = await super().add_token(token, refresh)
+        print('Added tokens... attempting to add the user')
+        if resp.user_id is not None:
+            uz = await self.create_partialuser(user_id=resp.user_id).user()
+            if uz.name is not None:
+                if uz.name in self.configuration:
+                    ck = self.configuration[uz.name]
+                    if 'cid' not in ck:
+                        print('Added the user :)')
+                        ck['cid'] = resp.user_id
+                        self.save()
+                        await self.join_channel(resp.user_id)
+                else:
+                    print('It is a new user, adding.')
+                    self.configuration[uz.name] = {"name": uz.name, "cid": resp.user_id}
+                    self.save()
+                    await self.join_channel(resp.user_id)
+            else:
+                print('Failed - uz.name was None')
+        else:
+            print('no user id for some reason')
+        return resp
 
     def save(self):
         with open(datafile("folderbot.json"), "w") as file:
@@ -133,9 +178,16 @@ class Bot(commands.Bot):
             json.dump(self.configuration, file, indent=2)
         print('Saved data.')
 
+class SimpleCommands(commands.Component):
+    def __init__(self, bot: Bot) -> None:
+        self.bot = bot
+        self.configuration = self.bot.configuration
+        self.save = self.bot.save
+        self.aaleaderboard = AALeaderboard()
+
     def add(self, ctx: commands.Context, command: str):
         import random
-        cn = ctx.channel.name.lower()
+        cn = (ctx.channel.name or "").lower()
         unknown = '^ unknown' 
         if cn not in self.configuration:
             if unknown not in self.configuration:
@@ -151,49 +203,28 @@ class Bot(commands.Bot):
         if random.random() < 0.1:
             self.save()
 
-
-    async def event_ready(self):
-        # Notify us when everything is ready!
-        # We are logged in and ready to chat and use commands...
-        print(f'Logged in as | {self.nick}')
-        print(f'User id is | {self.user_id}')
-
-    async def handle_commands(self, message: Message):
-        """
-        Handles commands from a given message.
-        This method checks if the message originates from the same channel
-        and if so, it delegates the handling of the commands to the parent class.
-        Args:
-            message (Message): The message object containing the command to be handled.
-        Returns:
-            None
-        """
-        if self.originates_from_same_channel(message):
-            await super().handle_commands(message)
     
-    def originates_from_same_channel(self, message: Message):
-        """
-        Determines if a message originates from the same channel.
-        This method checks if the message's destination channel ID matches its originating channel ID.
-        If the originating channel ID is not present, it assumes the message does not originate from a shared chat.
-        Args:
-            message (Message): The message object containing tags with channel information.
-        Returns:
-            bool: True if the message originates from the same channel or if there is no originating channel ID,
-              False otherwise.
-        """
-        dest_channel_id = message.tags.get('room-id') if 'room-id' in message.tags else None
-        if dest_channel_id is None:
-            return False
-        originating_channel_id = message.tags.get('source-room-id') if 'source-room-id' in message.tags else None
-        return originating_channel_id is None or originating_channel_id == dest_channel_id
+#    def originates_from_same_channel(self, message: Message):
+#        """
+#        Determines if a message originates from the same channel.
+#        This method checks if the message's destination channel ID matches its originating channel ID.
+#        If the originating channel ID is not present, it assumes the message does not originate from a shared chat.
+#        Args:
+#            message (Message): The message object containing tags with channel information.
+#        Returns:
+#            bool: True if the message originates from the same channel or if there is no originating channel ID,
+#              False otherwise.
+#        """
+#        dest_channel_id = message.tags.get('room-id') if 'room-id' in message.tags else None
+#        if dest_channel_id is None:
+#            return False
+#        originating_channel_id = message.tags.get('source-room-id') if 'source-room-id' in message.tags else None
+#        return originating_channel_id is None or originating_channel_id == dest_channel_id
 
 
     @commands.command()
     async def quicksave(self, ctx: commands.Context): ##### help
-        if not isinstance(ctx.author, Chatter):
-            return await do_send(ctx, 'No Chatter instance found.')
-        if ctx.author.name.lower() == 'desktopfolder':
+        if (ctx.author.name or "").lower() == 'desktopfolder':
             # yeah just me thanks.
             self.save()
             return await do_send(ctx, 'Quicksaved state.')
@@ -250,7 +281,8 @@ class Bot(commands.Bot):
         infos = [f'Time since update: {dur}.']
         if dur0 != dur:
             infos.append(f'({dur0} before this command)')
-        infos.append(f'Bot is in {len(self.configuration)} channels.')
+        vc = len([k for k in k, v in self.configuration if 'cid' in v])
+        infos.append(f'Bot knows of {len(self.configuration)} channels ({vc} joined).')
         infos.append(f'{len(data)} known AA runs.')
         last_nether = PacemanObject(data[0])
         if last_nether.get('nether') is not None:
@@ -268,16 +300,16 @@ class Bot(commands.Bot):
     ########################################################################################
     ############################# Methods to configure the bot #############################
     ########################################################################################
+    #@twitchio.ext.commands.is_broadcaster() # future..?
+    # @commands.is_broadcaster()
     @commands.command()
     async def setplayer(self, ctx: commands.Context, playername: str):
         self.add(ctx, 'setplayer')
-        if not isinstance(ctx.author, Chatter):
-            return await do_send(ctx, 'Cannot validate that you are the broadcaster.')
-        if not ctx.author.is_broadcaster:
+        if not ctx.author.broadcaster:
             return await do_send(ctx, 'Only the broadcaster can use this command.')
-        cn = ctx.channel.name.lower()
+        cn = (ctx.channel.name or "").lower()
         if not cn in self.configuration:
-            return await do_send(ctx, 'Let me know if you see this.')
+            return await do_send(ctx, 'Let me know if you see this. Agh, twitchio...')
         self.configuration[cn]['player'] = clean(playername)
         self.save()
         return await do_send(ctx, f'Set default player to {playername}.')
@@ -285,6 +317,7 @@ class Bot(commands.Bot):
     @commands.command()
     async def join(self, ctx: commands.Context, agree: str = ""):
         self.add(ctx, 'join')
+        return await do_send(ctx, "To add, go to: https://folderbot.disrespec.tech/oauth?scopes=channel:bot")
         cn = ctx.author.name
         if cn is None:
             return await do_send(ctx, "Name was none; if this issue persists, contact DesktopFolder.")
@@ -295,7 +328,8 @@ class Bot(commands.Bot):
             return await do_send(ctx, f'Notice: This is in development. See {self.prefix}botdiscord for current todos/feature requests. If you are okay with intermittent downtime & potential bugs, and want to join this bot to your channel ({cn}), type {self.prefix}join agree')
         self.configuration[cn] = {"name": cn}
         self.save()
-        await self.join_channels([cn])
+        for chn in cn:
+            await self.join_channel(chn)
         return await do_send(ctx, f'Theoretically joined {cn}. Note: If you have follower mode chat limitations, you MUST mod FolderBot for it to work in your channel.')
 
     ########################################################################################
@@ -306,6 +340,9 @@ class Bot(commands.Bot):
         player: Optional[str] = None
         time_range: Optional[td] = None
         for arg in args:
+            arg = (''.join(filter(lambda x: x in REAL_CHARS, arg))).strip()
+            if arg == '':
+                continue
             if arg.lower() in ALL_SPLITS:
                 if split is not None:
                     await do_send(ctx, f'Argument {arg} provided (parsed as split) but {split} was already provided!')
@@ -500,7 +537,7 @@ class Bot(commands.Bot):
             return playername.strip()
         if playername is not None:
             return clean(playername)
-        cn = ctx.channel.name.lower()
+        cn = (ctx.channel.name or "").lower()
         if cn not in self.configuration:
             return 'If you see this, please tell DesktopFolder'
         c = self.configuration[cn]
@@ -591,10 +628,10 @@ class Bot(commands.Bot):
     ############################# Methods for AA leaderboard ###############################
     ########################################################################################
     @commands.command()
-    async def aalb(self, ctx: commands.Context):
+    async def aalb(self, ctx: commands.Context, *, content: str):
         self.add(ctx, 'aalb')
         try:
-            args = ctx.message.content.split(' ')[1:]
+            args = content.split(' ')[1:]
             response = await self.aaleaderboard.query(self.playername(ctx), args)
             return await do_send(ctx, response or 'Unable to query the leaderboard.')
         except Exception:
