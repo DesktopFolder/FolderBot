@@ -102,7 +102,6 @@ class Bot(commands.Bot):
     def __init__(self, prefix='?'):
         import json
         self.prefix = prefix
-        self.aaleaderboard = AALeaderboard()
         default_configuration = """
         {
             "folderbot": {
@@ -142,6 +141,8 @@ class Bot(commands.Bot):
             else:
                 print('cannot join channel', k, "because we have no cid")
 
+        await self.add_component(SimpleCommands(self))
+
     async def add_token(self, token: str, refresh: str) -> twitchio.authentication.ValidateTokenPayload:
         # Make sure to call super() as it will add the tokens interally and return us some data...
         resp: twitchio.authentication.ValidateTokenPayload = await super().add_token(token, refresh)
@@ -172,6 +173,13 @@ class Bot(commands.Bot):
             import json
             json.dump(self.configuration, file, indent=2)
         print('Saved data.')
+
+class SimpleCommands(commands.Component):
+    def __init__(self, bot: Bot) -> None:
+        self.bot = bot
+        self.configuration = self.bot.configuration
+        self.save = self.bot.save
+        self.aaleaderboard = AALeaderboard()
 
     def add(self, ctx: commands.Context, command: str):
         import random
