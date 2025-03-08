@@ -295,10 +295,12 @@ class SimpleCommands(commands.Component):
     ########################################################################################
     ############################# Methods to configure the bot #############################
     ########################################################################################
+    #@twitchio.ext.commands.is_broadcaster() # future..?
     @commands.command()
+    @commands.is_broadcaster()
     async def setplayer(self, ctx: commands.Context, playername: str):
         self.add(ctx, 'setplayer')
-        if not ctx.author._is_broadcaster():
+        if not ctx.author.broadcaster:
             return await do_send(ctx, 'Only the broadcaster can use this command.')
         cn = (ctx.channel.name or "").lower()
         if not cn in self.configuration:
