@@ -128,7 +128,7 @@ class Bot(commands.Bot):
         """
         self.configuration: dict[str, dict] = json.loads(default_file(datafile("folderbot.json"), default_configuration))
 
-        adapter = web.AiohttpAdapter(domain="127.0.0.1", port=8009)
+        adapter = web.AiohttpAdapter(domain="folderbot.disrespec.tech", port=8009)
         super().__init__(**auth.client_auth(), prefix=prefix, adapter=adapter)
 
     async def join_channel(self, chan: str):
