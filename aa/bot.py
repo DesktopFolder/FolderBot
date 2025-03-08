@@ -281,7 +281,7 @@ class SimpleCommands(commands.Component):
         infos = [f'Time since update: {dur}.']
         if dur0 != dur:
             infos.append(f'({dur0} before this command)')
-        vc = len([k for k in k, v in self.configuration if 'cid' in v])
+        vc = len([k for k, v in self.configuration.items() if 'cid' in v])
         infos.append(f'Bot knows of {len(self.configuration)} channels ({vc} joined).')
         infos.append(f'{len(data)} known AA runs.')
         last_nether = PacemanObject(data[0])
