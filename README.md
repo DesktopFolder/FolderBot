@@ -18,3 +18,7 @@ RSPOTIFY_REDIRECT_URI=http://localhost:8888/callback
 `auth/secret.txt` should contain: oauth secret (e.g. `oauth:abcdef0135003150530`)
 
 `auth/user.txt` should contain: the bot username (e.g. `FolderBot`)
+
+### Twitch Authentication
+
+Uh, so the bot account is not the actual application...
