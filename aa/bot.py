@@ -145,7 +145,26 @@ class Bot(commands.Bot):
     async def add_token(self, token: str, refresh: str) -> twitchio.authentication.ValidateTokenPayload:
         # Make sure to call super() as it will add the tokens interally and return us some data...
         resp: twitchio.authentication.ValidateTokenPayload = await super().add_token(token, refresh)
-        resp.user_id
+        print('Added tokens... attempting to add the user')
+        if resp.user_id is not None:
+            uz = await self.create_partialuser(user_id=resp.user_id).user()
+            if uz.name is not None:
+                if uz.name in self.configuration:
+                    ck = self.configuration[uz.name]
+                    if 'cid' not in ck:
+                        print('Added the user :)')
+                        ck['cid'] = resp.user_id
+                        self.save()
+                        await self.join_channel(resp.user_id)
+                else:
+                    print('It is a new user, adding.')
+                    self.configuration[uz.name] = {"name": uz.name, "cid": resp.user_id}
+                    self.save()
+                    await self.join_channel(resp.user_id)
+            else:
+                print('Failed - uz.name was None')
+        else:
+            print('no user id for some reason')
         return resp
 
     def save(self):
@@ -283,6 +302,7 @@ class Bot(commands.Bot):
     @commands.command()
     async def join(self, ctx: commands.Context, agree: str = ""):
         self.add(ctx, 'join')
+        return await do_send(ctx, "To add, go to: https://folderbot.disrespec.tech/oauth?scopes=channel:bot")
         cn = ctx.author.name
         if cn is None:
             return await do_send(ctx, "Name was none; if this issue persists, contact DesktopFolder.")
