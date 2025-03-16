@@ -90,6 +90,13 @@ class td:
         l = [t.total_seconds() for t in ts]
         return td(timedelta(seconds=sum(l) // len(l)))
 
+    @staticmethod
+    def best(ts: list[timedelta]):
+        if len(ts) == 0:
+            return -1
+        l = sorted(ts, key=lambda teld: teld.total_seconds())
+        return td(l[0])
+
 DATAFILE = "aa.json"
 """
   {
@@ -128,6 +135,7 @@ class PacemanObject:
         # don't care uuid for now.
         self.twitch_root = d.get("twitch")
         self.inserted = d.get("insertTime")
+        self.last_updated = d.get("lastUpdated")
 
         # NOTE: insert_time is when nether was entered.
 
@@ -147,6 +155,11 @@ class PacemanObject:
         if self.inserted is None:
             return None
         return duration_since(self.inserted)
+
+    def time_since_updated(self):
+        if self.last_updated is None:
+            return None
+        return duration_since(self.last_updated)
 
     def get_str(self, split: str):
         res = self.splits.get(split)

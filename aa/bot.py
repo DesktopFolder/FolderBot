@@ -10,6 +10,7 @@ import auth
 from twitchio import eventsub, web
 import twitchio
 from string import printable
+import re
 
 
 REAL_CHARS=set(printable)
@@ -22,6 +23,22 @@ def ui(user_input: str) -> str:
     if user_input and not user_input[0].isalnum():
         return f'"{user_input}"'
     return user_input
+
+async def send_help(ctx: commands.Context, subject: str):
+    help_dict = {
+        "average": "average -> Returns the average time for a split.",
+        "session": "session -> Returns a player's session, with averages and best times (in square brackets []) for splits.",
+    }
+    norm_subj = subject.lower().strip('?!/')
+    return await do_send(ctx, help_dict.get(norm_subj, f"Sorry, {norm_subj} does not appear to have a help entry (yet)."))
+
+
+nonping_re = re.compile(r'(.{3})')
+def to_nonping(s: str):
+    import re
+    # this is a special non printing character
+    break_char = "󠀀"
+    return break_char.join([x for x in nonping_re.split(s) if x])
 
 
 class ParseResult:
@@ -235,7 +252,7 @@ class SimpleCommands(commands.Component):
     ############################ Methods to send generic strings ###########################
     ########################################################################################
     @commands.command()
-    async def help(self, ctx: commands.Context, page = 1): ##### help
+    async def help(self, ctx: commands.Context, page: int | str = 1): ##### help
         self.add(ctx, 'help')
         helpers = [
             "AA Paceman extension: ?statscommands -> List of stats commands with details (WIP), "
@@ -246,6 +263,8 @@ class SimpleCommands(commands.Component):
             f"(help 3) All splits: {', '.join(ALL_SPLITS)}",
             '(help 4) ?info -> Metadata on bot status, ?botdiscord -> Server with bot information, ?about -> Credits'
         ]
+        if isinstance(page, str):
+            return await send_help(ctx, page)
         p = page - 1
         if p < 0 or p >= len(helpers):
             return await do_send(ctx, f"Page number is out of bounds (maximum: {len(helpers)})")
@@ -258,7 +277,7 @@ class SimpleCommands(commands.Component):
         await do_send(ctx, helpers[0])
     @commands.command()
     async def all(self, ctx: commands.Context): ##### help
-        await do_send(ctx, "?average, ?conversion, ?count, ?countlt, ?countgt, ?bastion_breakdown, ?latest, ?trend")
+        await do_send(ctx, "?average, ?conversion, ?count, ?countlt, ?countgt, ?bastion_breakdown, ?latest, ?trend, ?session")
     @commands.command()
     async def aapaceman(self, ctx: commands.Context): ##### help
         await do_send(ctx, "AACord message link: "
@@ -591,6 +610,71 @@ class SimpleCommands(commands.Component):
             root += f'That is roughly {td(diff)} faster, nice!'
         
         return await do_send(ctx, root)
+
+    @commands.command()
+    async def session(self, ctx: commands.Context, *args):
+        """
+        oshbot's formatting:
+        to_nonping(desktopfolder) Session Stats (1h10m, 11h ago): • nethers: 9 (2:23 avg, 7.73 nph, 667 rpe) • first structures: 5 (3:38 avg) • second structures: 2 (8:47 avg) • first portals: 2 (11:12 avg) • strongholds: 2 (13:59 avg) • end enters: 2 (15:52 avg) • finishes: 1 (13:35 avg)
+        """
+        pr, pcs = await self.parse_get(ctx, *args)
+        if pr is None or pcs is None:
+            return
+        if not pcs:
+            return await do_send(ctx, f'No results found for {to_nonping(pr.player_str())}')
+        if pr.is_everyone():
+            return await do_send(ctx, 'Sorry, this command cannot be used for the full playerbase.')
+
+        max_delta = timedelta(hours=3)
+        
+        session: list[PacemanObject] = list()
+        last_start = pcs[0].time_since()
+        if last_start is None:
+            return await do_send(ctx, 'Latest nether has no insert time -> likely PaceMan error.')
+        # essentially, globbing by 4h.
+        for pc in pcs:
+            start = pc.time_since()
+            end = pc.time_since_updated()
+            if start is None or end is None:
+                break
+
+            # Difference between our END and the LAST START.
+            # Because we start with the latest nether and move into the past.
+            # These are all "time since". So "time since END" should be greater than "LAST START".
+            if (end - last_start) > max_delta:
+                break
+
+            # Otherwise, we can move variables.
+            last_start = start
+            session.append(pc)
+
+        # Okay, that should be our globbing.
+        ltds = {}
+        for pc in session:
+            for split, otd in pc.splits.items():
+                if split not in ltds:
+                    ltds[split] = list()
+                ltds[split].append(otd)
+
+        data = list()
+        for split in ALL_SPLITS:
+            if split not in ltds:
+                continue
+            scount = len(ltds[split])
+            savg = td.average(ltds[split])
+            sbest = td.best(ltds[split])
+            data.append((split, scount, savg, sbest))
+
+        data_str = " • ".join(f'{qs}: {qn} ({qa} [{qb}])' for qs, qn, qa, qb in data)
+
+        # first list object is latest (so end)
+        try:
+            start = td(session[-1].time_since())
+            end = td(session[0].time_since_updated())
+        except Exception:
+            return await do_send(ctx, 'some issue with timestamps sorry')
+        return await do_send(ctx, f"{to_nonping(pr.player_str())} session ({start} : {end}): {data_str}")
+
 
     @commands.command()
     async def bastion_breakdown(self, ctx: commands.Context, *args):
