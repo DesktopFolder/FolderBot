@@ -714,10 +714,10 @@ class SimpleCommands(commands.Component):
     ############################# Methods for AA leaderboard ###############################
     ########################################################################################
     @commands.command()
-    async def aalb(self, ctx: commands.Context, *, content: str):
+    async def aalb(self, ctx: commands.Context, *, content: Optional[str] = None):
         self.add(ctx, 'aalb')
         try:
-            args = content.split(' ')
+            args = content.split(' ') if content is not None else list()
             response = await self.aaleaderboard.query(self.playername(ctx), args)
             return await do_send(ctx, response or 'Unable to query the leaderboard.')
         except Exception:
