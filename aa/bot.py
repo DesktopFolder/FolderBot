@@ -307,7 +307,7 @@ class SimpleCommands(commands.Component):
         if last_nether.get('nether') is not None:
             infos.append(f'Latest nether: {last_nether.get_str("nether")} by {last_nether.player}.')
         tot_calls = 0
-        stats_commands = {'average', 'conversion', 'count', 'countlt', 'countgt', 'bastion_breakdown', 'latest', 'trend', 'pb'}
+        stats_commands = {'average', 'conversion', 'count', 'countlt', 'countgt', 'bastion_breakdown', 'latest', 'trend', 'pb', 'session'}
         stats_stats = [f'command_{s}' for s in stats_commands]
         for v in self.configuration.values():
             for st in stats_stats:
@@ -617,6 +617,7 @@ class SimpleCommands(commands.Component):
         oshbot's formatting:
         to_nonping(desktopfolder) Session Stats (1h10m, 11h ago): • nethers: 9 (2:23 avg, 7.73 nph, 667 rpe) • first structures: 5 (3:38 avg) • second structures: 2 (8:47 avg) • first portals: 2 (11:12 avg) • strongholds: 2 (13:59 avg) • end enters: 2 (15:52 avg) • finishes: 1 (13:35 avg)
         """
+        self.add(ctx, 'session')
         pr, pcs = await self.parse_get(ctx, *args)
         if pr is None or pcs is None:
             return
@@ -716,7 +717,7 @@ class SimpleCommands(commands.Component):
     async def aalb(self, ctx: commands.Context, *, content: str):
         self.add(ctx, 'aalb')
         try:
-            args = content.split(' ')[1:]
+            args = content.split(' ')
             response = await self.aaleaderboard.query(self.playername(ctx), args)
             return await do_send(ctx, response or 'Unable to query the leaderboard.')
         except Exception:
