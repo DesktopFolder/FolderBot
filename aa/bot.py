@@ -671,9 +671,10 @@ class SimpleCommands(commands.Component):
         try:
             start = td(session[-1].time_since())
             end = td(session[0].time_since_updated())
+            dura = td(timedelta(seconds=start.total_seconds() - end.total_seconds()))
         except Exception:
             return await do_send(ctx, 'some issue with timestamps sorry')
-        return await do_send(ctx, f"{to_nonping(pr.player_str())} session ({start} : {end}): {data_str}")
+        return await do_send(ctx, f"{to_nonping(pr.player_str())} session ({start} ago, {dura} long): {data_str}")
 
 
     @commands.command()
