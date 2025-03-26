@@ -148,6 +148,9 @@ class PacemanObject:
                 continue
             self.splits[k] = timedelta(milliseconds=v)
 
+    def __str__(self):
+        return f'ID: {self.id}, inserted: {self.inserted}, #Adv: {self.num_advancements}'
+
     def all_sorted(self):
         return sorted([(k, v) for k, v in self.splits.items()], key=lambda t: t[1])
 
@@ -187,6 +190,8 @@ class PacemanObject:
         return self.splits.get(split)
 
     def always_get(self, split: str):
+        if split not in self.splits:
+            raise RuntimeError(f'Failed to get split {split} from a PacemanObject: {self}')
         return self.splits[split]
 
     def filter(self, split=None, player=None):

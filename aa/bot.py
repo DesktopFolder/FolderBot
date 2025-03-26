@@ -695,10 +695,10 @@ class SimpleCommands(commands.Component):
                 return ''
             return f'Conversion for {s} nethers: {pctgwith(l)}% ({len(l)})'
 
-        sub_330, pcs = partition(pcs, lambda p: p.get('nether').total_seconds() < 60 * 3 + 30)
-        sub_400, pcs = partition(pcs, lambda p: p.get('nether').total_seconds() < 60 * 4)
-        sub_430, pcs = partition(pcs, lambda p: p.get('nether').total_seconds() < 60 * 4 + 30)
-        sub_500, pcs = partition(pcs, lambda p: p.get('nether').total_seconds() < 60 * 5)
+        sub_330, pcs = partition(pcs, lambda p: p.always_get('nether').total_seconds() < 60 * 3 + 30)
+        sub_400, pcs = partition(pcs, lambda p: p.always_get('nether').total_seconds() < 60 * 4)
+        sub_430, pcs = partition(pcs, lambda p: p.always_get('nether').total_seconds() < 60 * 4 + 30)
+        sub_500, pcs = partition(pcs, lambda p: p.always_get('nether').total_seconds() < 60 * 5)
         brk = ' | '.join([x for x in [
                 writer(sub_330, '< 3:30'),
                 writer(sub_400, '3:30-4:00'),
