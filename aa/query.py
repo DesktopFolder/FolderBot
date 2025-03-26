@@ -144,7 +144,7 @@ class PacemanObject:
         # So much better than before, lol.
         self.splits: dict[str, timedelta] = dict()
         for k, v in d.items():
-            if not isinstance(v, int) or v < 1000 * 60:
+            if not isinstance(v, int) or (v < 1000 * 60 and v != 'nether'):
                 continue
             self.splits[k] = timedelta(milliseconds=v)
 
