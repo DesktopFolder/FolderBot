@@ -1,6 +1,7 @@
 from datetime import timedelta
 from typing import Callable, Optional
 from aalb import AALeaderboard
+import logging
 # from twitchio import Chatter, Message, PartialChatter
 from twitchio.ext import commands
 from daemon import data_dir, datafile, seconds_since_update, duration_since_update
@@ -123,6 +124,7 @@ class Bot(commands.Bot):
     def __init__(self, prefix='?'):
         import json
         self.prefix = prefix
+        self.channels_joined = 0
         default_configuration = """
         {
             "folderbot": {
@@ -153,6 +155,7 @@ class Bot(commands.Bot):
 
     async def join_channel(self, chan: str):
         subscription = eventsub.ChatMessageSubscription(broadcaster_user_id=chan, user_id='263137120')
+        self.channels_joined += 1
         await self.subscribe_websocket(payload=subscription)
 
     async def setup_hook(self):
@@ -300,7 +303,8 @@ class SimpleCommands(commands.Component):
         infos = [f'Time since update: {dur}.']
         if dur0 != dur:
             infos.append(f'({dur0} before this command)')
-        vc = len([k for k, v in self.configuration.items() if 'cid' in v])
+        # vc = len([k for k, v in self.configuration.items() if 'cid' in v])
+        vc = self.bot.channels_joined
         infos.append(f'Bot knows of {len(self.configuration)} channels ({vc} joined).')
         infos.append(f'{len(data)} known AA runs.')
         last_nether = PacemanObject(data[0])
@@ -726,6 +730,10 @@ class SimpleCommands(commands.Component):
 
 
 if __name__ == '__main__':
+    fh = logging.FileHandler('output.log')
+    fh.setLevel(logging.DEBUG)
+    twitchio.utils.setup_logging(level=logging.INFO, handler=fh)
+    logging.debug('Initializing bot...')
     args = argv[1:]
     if 'test' in args:
         bot = Bot(prefix='%')
