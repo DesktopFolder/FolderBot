@@ -91,6 +91,18 @@ class td:
         return td(timedelta(seconds=sum(l) // len(l)))
 
     @staticmethod
+    def median(ts: list[timedelta]):
+        if len(ts) == 0:
+            return -1
+        l = sorted([t.total_seconds() for t in ts])
+        num = len(l)
+        if num % 2 == 0:
+            med = (l[(num // 2) - 1] + l[(num // 2)]) // 2
+        else:
+            med = l[num // 2]
+        return td(timedelta(seconds=med))
+
+    @staticmethod
     def best(ts: list[timedelta]):
         if len(ts) == 0:
             return -1

@@ -429,7 +429,8 @@ class SimpleCommands(commands.Component):
             return
         #if not splitname in ALL_SPLITS:
         #    return await do_send(ctx, f'{splitname} is not a valid AA split: {ALL_SPLITS}')
-        await do_send(ctx, f'Average AA {pr.split_str()} for {pr.player_str()}: {td.average(ts=[pc.always_get(pr.split_str()) for pc in pcs])} (sample: {len(pcs)}){pr.tr_str()}')
+        dataset = [pc.always_get(pr.split_str()) for pc in pcs]
+        await do_send(ctx, f'Average AA {pr.split_str()} for {pr.player_str()}: {td.average(ts=dataset)} (sample: {len(pcs)}) (median: {td.median(ts=dataset)}){pr.tr_str()}')
 
     @commands.command()
     async def conversion(self, ctx: commands.Context, split1: str, split2: str, *args: str):
