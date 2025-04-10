@@ -4,7 +4,7 @@ from aalb import AALeaderboard
 import logging
 # from twitchio import Chatter, Message, PartialChatter
 from twitchio.ext import commands
-from daemon import data_dir, datafile, seconds_since_update, duration_since_update
+from daemon import data_dir, datafile, seconds_since_update, duration_since_update, duration_since
 from query import DATA, PacemanObject, DATA_SORTED, ALL_SPLITS, USEFUL_DATA, td
 from sys import argv
 import auth
@@ -309,7 +309,11 @@ class SimpleCommands(commands.Component):
         infos.append(f'{len(data)} known AA runs.')
         last_nether = PacemanObject(data[0])
         if last_nether.get('nether') is not None:
-            infos.append(f'Latest nether: {last_nether.get_str("nether")} by {last_nether.player}.')
+            if last_nether.inserted is not None:
+                tsz = f' ({duration_since(last_nether.inserted)})'
+            else:
+                tsz = ''
+            infos.append(f'Latest nether: {last_nether.get_str("nether")} by {last_nether.player}{tsz}.')
         tot_calls = 0
         stats_commands = {'average', 'conversion', 'count', 'countlt', 'countgt', 'bastion_breakdown', 'latest', 'trend', 'pb', 'session'}
         stats_stats = [f'command_{s}' for s in stats_commands]
@@ -408,6 +412,13 @@ class SimpleCommands(commands.Component):
         if pr is None:
             return # Failed parse.
         return await do_send(ctx, f'Parsed player as {pr.player_str()}, time range as {pr.time}, and split as {pr.split_str()}')
+
+    @commands.command()
+    async def paceman(self, ctx: commands.Context, *args: str):
+        pr = await self.parse(ctx, *args)
+        if pr is None:
+            return # Failed parse.
+        return await do_send(ctx, f'Paceman link: https://paceman.gg/stats/player/{pr.player_str()}/aa/')
             
     @commands.command()
     async def average(self, ctx: commands.Context, *args: str):
