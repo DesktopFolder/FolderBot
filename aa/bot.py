@@ -682,7 +682,12 @@ class SimpleCommands(commands.Component):
             sbest = td.best(ltds[split])
             data.append((split, scount, savg, sbest))
 
-        data_str = " • ".join(f'{qs}: {qn} ({qa} [{qb}])' for qs, qn, qa, qb in data)
+        def format_best(qs, qn, qa, qb):
+            if qn > 1:
+                return f'{qs}: {qn} ({qa} [{qb}])'
+            else:
+                return f'{qs}: {qn} ({qa})'
+        data_str = " • ".join(format_best(qs, qn, qa, qb) for qs, qn, qa, qb in data)
 
         # first list object is latest (so end)
         try:
