@@ -309,8 +309,9 @@ class SimpleCommands(commands.Component):
         infos.append(f'{len(data)} known AA runs.')
         last_nether = PacemanObject(data[0])
         if last_nether.get('nether') is not None:
-            if last_nether.inserted is not None:
-                tsz = f' ({duration_since(last_nether.inserted)})'
+            iz = last_nether.time_since()
+            if iz is not None:
+                tsz = f' ({btd(iz)} ago)'
             else:
                 tsz = ''
             infos.append(f'Latest nether: {last_nether.get_str("nether")} by {last_nether.player}{tsz}.')
