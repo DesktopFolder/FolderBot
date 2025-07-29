@@ -153,15 +153,19 @@ class Bot(commands.Bot):
         adapter = web.AiohttpAdapter(domain="folderbot.disrespec.tech", port=8009)
         super().__init__(**auth.client_auth(), prefix=prefix, adapter=adapter)
 
-    async def join_channel(self, chan: str):
+    async def join_channel(self, chan: str, name_info=""):
+        if len(name_info) != 0:
+            name_info = f" ({name_info})"
+        print(f'bot.py:join_channel: Joining channel: {chan}{name_info}')
         subscription = eventsub.ChatMessageSubscription(broadcaster_user_id=chan, user_id='263137120')
         self.channels_joined += 1
         await self.subscribe_websocket(payload=subscription)
+        print(f'bot.py:join_channel: Successfully joined channel: {chan}{name_info}')
 
     async def setup_hook(self):
         for k, v in self.configuration.items():
             if "cid" in v:
-                await self.join_channel(v["cid"])
+                await self.join_channel(v["cid"], name_info=k)
             else:
                 print('cannot join channel', k, "because we have no cid")
 
@@ -180,12 +184,12 @@ class Bot(commands.Bot):
                         print('Added the user :)')
                         ck['cid'] = resp.user_id
                         self.save()
-                        await self.join_channel(resp.user_id)
+                        await self.join_channel(resp.user_id, name_info=uz.name)
                 else:
                     print('It is a new user, adding.')
                     self.configuration[uz.name] = {"name": uz.name, "cid": resp.user_id}
                     self.save()
-                    await self.join_channel(resp.user_id)
+                    await self.join_channel(resp.user_id, name_info=uz.name)
             else:
                 print('Failed - uz.name was None')
         else:
@@ -346,6 +350,7 @@ class SimpleCommands(commands.Component):
     async def join(self, ctx: commands.Context, agree: str = ""):
         self.add(ctx, 'join')
         return await do_send(ctx, "To add, go to: https://folderbot.disrespec.tech/oauth?scopes=channel:bot")
+        """
         cn = ctx.author.name
         if cn is None:
             return await do_send(ctx, "Name was none; if this issue persists, contact DesktopFolder.")
@@ -359,6 +364,7 @@ class SimpleCommands(commands.Component):
         for chn in cn:
             await self.join_channel(chn)
         return await do_send(ctx, f'Theoretically joined {cn}. Note: If you have follower mode chat limitations, you MUST mod FolderBot for it to work in your channel.')
+        """
 
     ########################################################################################
     ############################# Methods for stat querying :) #############################
@@ -437,7 +443,7 @@ class SimpleCommands(commands.Component):
         self.add(ctx, 'conversion')
         pr = await self.parse(ctx, *args)
         if pr is None:
-            return
+            return # Error message should always be sent by parse.
         if pr.split is not None:
             return await do_send(ctx, f'Found third split {pr.split} - likely parse failure.')
         # yikes need to do some refactoring
@@ -449,7 +455,8 @@ class SimpleCommands(commands.Component):
 
         data = await pr.with_data(ctx)
         if data is None:
-            return
+            return await do_send(ctx, f'Found no data matching the specification. Check that the' +
+                                       'Minecraft username is set correctly for this stream with ?setplayer.')
         pcs = [p for p in data if p.filter(split=split1)]
         if len(pcs) == 0:
             return await do_send(ctx, f'{ui(pr.player_str())} has no known {split1} AA splits.')
