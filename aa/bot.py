@@ -227,6 +227,30 @@ class SimpleCommands(commands.Component):
         if random.random() < 0.1:
             self.save()
 
+    def config(self, ctx: commands.Context) -> dict | None:
+        cn = (ctx.channel.name or "").lower()
+        if cn not in self.configuration:
+            return None
+        else:
+            return self.configuration[cn]
+
+    def check_restrict(self, ctx: commands.Context) -> bool:
+        cf = self.config(ctx)
+        if cf is None:
+            return True # Restricted
+        if cf.get('restrict') == None:
+            return False # Not restricted
+        if cf.get('restrict') == 'broadcaster':
+            return not ctx.author.broadcaster
+        if cf.get('restrict') == 'moderator':
+            return not (ctx.author.moderator or ctx.author.broadcaster)
+        raise ValueError(f'Invalid restrict value: {cf["restrict"]}')
+
+    def restrict_and_add(self, ctx: commands.Context) -> bool:
+        if self.check_restrict(ctx):
+            self.add(ctx, "restricted")
+            return True
+        return False
     
 #    def originates_from_same_channel(self, message: Message):
 #        """
@@ -248,6 +272,8 @@ class SimpleCommands(commands.Component):
 
     @commands.command()
     async def quicksave(self, ctx: commands.Context): ##### help
+        if self.restrict_and_add(ctx):
+            return
         if (ctx.author.name or "").lower() == 'desktopfolder':
             # yeah just me thanks.
             self.save()
@@ -260,6 +286,8 @@ class SimpleCommands(commands.Component):
     ########################################################################################
     @commands.command()
     async def help(self, ctx: commands.Context, page: int | str = 1): ##### help
+        if self.restrict_and_add(ctx):
+            return
         self.add(ctx, 'help')
         helpers = [
             "AA Paceman extension: ?statscommands -> List of stats commands with details (WIP), "
@@ -278,28 +306,40 @@ class SimpleCommands(commands.Component):
         await do_send(ctx, helpers[p])
     @commands.command()
     async def statscommands(self, ctx: commands.Context): ##### help
+        if self.restrict_and_add(ctx):
+            return
         helpers = ["?average [splitname] [player] -> average split for a player, ?conversion "
                 "[split1] [split2] [player] -> % of split1s that turn into split2s, ?countlt "
                 "[split] [time] [player] -> Count the # of splits that are faster than [time]"]
         await do_send(ctx, helpers[0])
     @commands.command()
     async def all(self, ctx: commands.Context): ##### help
+        if self.restrict_and_add(ctx):
+            return
         await do_send(ctx, "?average, ?conversion, ?count, ?countlt, ?countgt, ?bastion_breakdown, ?latest, ?trend, ?session")
     @commands.command()
     async def aapaceman(self, ctx: commands.Context): ##### help
+        if self.restrict_and_add(ctx):
+            return
         await do_send(ctx, "AACord message link: "
                 "https://discord.com/channels/835893596992438372/835893596992438375/1330305232516677733"
                 " (how to set up aa paceman)")
     @commands.command()
     async def botdiscord(self, ctx: commands.Context): ##### bot discord
+        if self.restrict_and_add(ctx):
+            return
         self.add(ctx, 'botdiscord')
         await do_send(ctx, "For to-do list & feature requests: https://discord.gg/NSp5t3wfBP")
     @commands.command()
     async def about(self, ctx: commands.Context): ##### about
+        if self.restrict_and_add(ctx):
+            return
         self.add(ctx, 'about')
         await do_send(ctx, "Made by DesktopFolder. Uses stats from Jojoe's Paceman AA API. Uses local caching to reduce API calls.")
     @commands.command()
     async def info(self, ctx: commands.Context):  ##### info
+        if self.restrict_and_add(ctx):
+            return
         self.add(ctx, 'info')
         dur0 = duration_since_update()
         data = DATA_SORTED()
@@ -336,6 +376,8 @@ class SimpleCommands(commands.Component):
     # @commands.is_broadcaster()
     @commands.command()
     async def setplayer(self, ctx: commands.Context, playername: str):
+        if self.restrict_and_add(ctx):
+            return
         self.add(ctx, 'setplayer')
         if not ctx.author.broadcaster:
             return await do_send(ctx, 'Only the broadcaster can use this command.')
@@ -347,7 +389,28 @@ class SimpleCommands(commands.Component):
         return await do_send(ctx, f'Set default player to {playername}.')
 
     @commands.command()
+    async def restrict(self, ctx: commands.Context, restriction: str):
+        if self.restrict_and_add(ctx):
+            return
+        self.add(ctx, 'restrict')
+        if not ctx.author.broadcaster:
+            return await do_send(ctx, 'Only the broadcaster can use this command.')
+        cn = (ctx.channel.name or "").lower()
+        if not cn in self.configuration:
+            return await do_send(ctx, 'Let me know if you see this. Agh, twitchio...')
+        valid_values = ['none', 'moderator', 'broadcaster']
+        if restriction not in valid_values:
+            return await do_send(ctx, f'Invalid restriction "{restriction}". Valid options: ' +
+                                 ', '.join(valid_values))
+
+        self.configuration[cn]['restrict'] = None if restriction == 'none' else restriction
+        self.save()
+        return await do_send(ctx, f'Set command restriction level to {restriction}.')
+
+    @commands.command()
     async def join(self, ctx: commands.Context, agree: str = ""):
+        if self.restrict_and_add(ctx):
+            return
         self.add(ctx, 'join')
         return await do_send(ctx, "To add, go to: https://folderbot.disrespec.tech/oauth?scopes=channel:bot")
         """
@@ -415,6 +478,8 @@ class SimpleCommands(commands.Component):
 
     @commands.command()
     async def test_parse(self, ctx: commands.Context, *args: str):
+        if self.restrict_and_add(ctx):
+            return
         pr = await self.parse(ctx, *args)
         if pr is None:
             return # Failed parse.
@@ -422,6 +487,8 @@ class SimpleCommands(commands.Component):
 
     @commands.command()
     async def paceman(self, ctx: commands.Context, *args: str):
+        if self.restrict_and_add(ctx):
+            return
         pr = await self.parse(ctx, *args)
         if pr is None:
             return # Failed parse.
@@ -429,6 +496,8 @@ class SimpleCommands(commands.Component):
             
     @commands.command()
     async def average(self, ctx: commands.Context, *args: str):
+        if self.restrict_and_add(ctx):
+            return
         self.add(ctx, 'average')
         pr, pcs = await self.parse_get(ctx, *args)
         if pr is None or pcs is None:
@@ -440,6 +509,8 @@ class SimpleCommands(commands.Component):
 
     @commands.command()
     async def conversion(self, ctx: commands.Context, split1: str, split2: str, *args: str):
+        if self.restrict_and_add(ctx):
+            return
         self.add(ctx, 'conversion')
         pr = await self.parse(ctx, *args)
         if pr is None:
@@ -466,6 +537,8 @@ class SimpleCommands(commands.Component):
 
     @commands.command()
     async def count(self, ctx: commands.Context, *args):
+        if self.restrict_and_add(ctx):
+            return
         self.add(ctx, 'count')
         pr, pcs = await self.parse_get(ctx, *args)
         if pr is None or pcs is None:
@@ -494,6 +567,8 @@ class SimpleCommands(commands.Component):
 
     @commands.command()
     async def pb(self, ctx: commands.Context, *args: str):
+        if self.restrict_and_add(ctx):
+            return
         self.add(ctx, 'pb')
         pr, pcs = await self.parse_get(ctx, *args, default_split='finish')
         if pr is None or pcs is None:
@@ -517,6 +592,8 @@ class SimpleCommands(commands.Component):
 
     @commands.command()
     async def lb(self, ctx: commands.Context, *args: str):
+        if self.restrict_and_add(ctx):
+            return
         self.add(ctx, 'lb')
         pr, pcs = await self.parse_get(ctx, *args, default_split='finish', default_all=True)
         if pr is None or pcs is None:
@@ -534,6 +611,8 @@ class SimpleCommands(commands.Component):
 
     @commands.command()
     async def countlt(self, ctx: commands.Context, time: str, *args: str):
+        if self.restrict_and_add(ctx):
+            return
         self.add(ctx, 'countlt')
         try:
             maximum = td(time)
@@ -555,6 +634,8 @@ class SimpleCommands(commands.Component):
 
     @commands.command()
     async def countgt(self, ctx: commands.Context, time: str, *args: str):
+        if self.restrict_and_add(ctx):
+            return
         self.add(ctx, 'countgt')
         try:
             minimum = td(time)
@@ -590,6 +671,8 @@ class SimpleCommands(commands.Component):
 
     @commands.command()
     async def latest(self, ctx: commands.Context, *args):
+        if self.restrict_and_add(ctx):
+            return
         # TODO - n parameter
         self.add(ctx, 'latest')
         pr, pcs = await self.parse_get(ctx, *args)
@@ -607,6 +690,8 @@ class SimpleCommands(commands.Component):
 
     @commands.command()
     async def trend(self, ctx: commands.Context, *args):
+        if self.restrict_and_add(ctx):
+            return
         from datetime import timedelta
         # TODO - n parameter
         self.add(ctx, 'trend')
@@ -637,6 +722,8 @@ class SimpleCommands(commands.Component):
 
     @commands.command()
     async def session(self, ctx: commands.Context, *args):
+        if self.restrict_and_add(ctx):
+            return
         """
         oshbot's formatting:
         to_nonping(desktopfolder) Session Stats (1h10m, 11h ago): • nethers: 9 (2:23 avg, 7.73 nph, 667 rpe) • first structures: 5 (3:38 avg) • second structures: 2 (8:47 avg) • first portals: 2 (11:12 avg) • strongholds: 2 (13:59 avg) • end enters: 2 (15:52 avg) • finishes: 1 (13:35 avg)
@@ -709,6 +796,8 @@ class SimpleCommands(commands.Component):
 
     @commands.command()
     async def bastion_breakdown(self, ctx: commands.Context, *args):
+        if self.restrict_and_add(ctx):
+            return
         self.add(ctx, 'bastion_breakdown')
         pr, pcs = await self.parse_get(ctx, *args)
         if pr is None or pcs is None:
@@ -744,6 +833,8 @@ class SimpleCommands(commands.Component):
     ########################################################################################
     @commands.command()
     async def aalb(self, ctx: commands.Context, *, content: Optional[str] = None):
+        if self.restrict_and_add(ctx):
+            return
         self.add(ctx, 'aalb')
         try:
             args = content.split(' ') if content is not None else list()
