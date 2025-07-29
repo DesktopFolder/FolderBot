@@ -289,6 +289,7 @@ class SimpleCommands(commands.Component):
         if self.restrict_and_add(ctx):
             return
         self.add(ctx, 'help')
+        return await do_send(ctx, "https://disrespec.tech/mcsr/folderbot")
         helpers = [
             "AA Paceman extension: ?statscommands -> List of stats commands with details (WIP), "
             "?all -> List of all commands (no details) "
