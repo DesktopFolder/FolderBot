@@ -697,7 +697,7 @@ impl IRCBotClient {
             "meta:help" => self
                 .sender
                 .send(TwitchFmt::privmsg(
-                    &"No help for you, good sir!".to_string(),
+                    &"If you'd like to help me out, donate today using !donate".to_string(),
                     &self.channel,
                 ))
                 .await
