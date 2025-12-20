@@ -158,9 +158,12 @@ class Bot(commands.AutoBot):
             name_info = f" ({name_info})"
         print(f'bot.py:join_channel: Joining channel: {chan}{name_info}')
         subscription = eventsub.ChatMessageSubscription(broadcaster_user_id=chan, user_id='263137120')
-        self.channels_joined += 1
-        await self.subscribe_websocket(payload=subscription)
-        print(f'bot.py:join_channel: Successfully joined channel: {chan}{name_info}')
+        resp = await self.multi_subscribe([subscription])
+        if resp.errors:
+            print(f'bot.py:join_channel: FAILED TO JOIN channel: {chan}{name_info}')
+        else:
+            self.channels_joined += 1
+            print(f'bot.py:join_channel: Successfully joined channel: {chan}{name_info}')
 
     async def setup_hook(self):
         for k, v in self.configuration.items():
