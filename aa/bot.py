@@ -119,7 +119,7 @@ def default_file(filename: str, data: str):
     except Exception:
         return data
 
-class Bot(commands.Bot):
+class Bot(commands.AutoBot):
 
     def __init__(self, prefix='?'):
         import json
