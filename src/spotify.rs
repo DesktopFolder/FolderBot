@@ -5,7 +5,7 @@ pub struct SpotifyChecker {
 }
 
 impl SpotifyChecker {
-    pub async fn new() -> SpotifyChecker {
+    pub async fn new() -> Option<SpotifyChecker> {
         // spotify
         let rspotify_config = Config {
             token_cached: true,
@@ -17,12 +17,14 @@ impl SpotifyChecker {
         let oauth = OAuth::from_env(scopes).unwrap();
         let spotify = AuthCodeSpotify::with_config(creds, oauth, rspotify_config);
         let url = spotify.get_authorize_url(false).unwrap();
-        spotify.prompt_for_token(&url).await.unwrap();
+        let res = spotify.prompt_for_token(&url).await;
 
-        // spotify.add_item_to_queue("https://open.spotify.com/track/3ZEno9fORwMA1HPecdLi0R", None);
-
-        SpotifyChecker {
-            spotify
+        if let Ok(_) = res {
+            Some(SpotifyChecker {
+                spotify
+            })
+        } else {
+            None
         }
     }
 }

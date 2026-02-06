@@ -265,7 +265,7 @@ struct IRCBotClient {
     #[cfg(feature = "audio")]
     audio: Audio,
     autosave: bool,
-    spotify: SpotifyChecker,
+    spotify: Option<SpotifyChecker>,
     player_data: PlayerData,
     any_leaderboard: Option<LeaderboardClient>,
     yahtzee: Option<folderbot::yahtzee::Yahtzee>,
@@ -413,7 +413,10 @@ impl IRCBotClient {
             if user == "pacmanmvc" && cmd.contains("opper") {
                 send_msg(&"Good day, PacManner.".to_string()).await;
             } else if has_responses(&ug) && thread_rng().gen_bool(3.0 / response_mod) {
-                println!("Sending USER user greet (3.0 / {}) for {}", response_mod, &user);
+                println!(
+                    "Sending USER user greet (3.0 / {}) for {}",
+                    response_mod, &user
+                );
                 let name = pd.name().clone();
                 self.send_msg(random_response(&ug).replace("{ur}", &name))
                     .await;
@@ -1613,49 +1616,50 @@ impl IRCBotClient {
                 return Command::Continue;
             }
             "core:functioning_get_song" => {
-                let song_response = self
-                    .spotify
-                    .spotify
-                    .current_playing(None, Some([&AdditionalType::Track]))
-                    .await;
+                if let Some(s) = self.spotify.as_ref() {
+                    let song_response = s
+                        .spotify
+                        .current_playing(None, Some([&AdditionalType::Track]))
+                        .await;
 
-                let message = match song_response {
-                    Ok(playing) => match playing {
-                        Some(playing) => match playing.item {
-                            Some(playable_item) => match playable_item {
-                                PlayableItem::Track(track) => {
-                                    let artists = track.artists;
+                    let message = match song_response {
+                        Ok(playing) => match playing {
+                            Some(playing) => match playing.item {
+                                Some(playable_item) => match playable_item {
+                                    PlayableItem::Track(track) => {
+                                        let artists = track.artists;
 
-                                    let mut message = String::new();
-                                    for (i, artist) in artists.iter().enumerate() {
-                                        if i != artists.len() - 1 {
-                                            message += &format!("{}, ", artist.name);
-                                        } else {
-                                            message += &format!("{} - ", artist.name);
+                                        let mut message = String::new();
+                                        for (i, artist) in artists.iter().enumerate() {
+                                            if i != artists.len() - 1 {
+                                                message += &format!("{}, ", artist.name);
+                                            } else {
+                                                message += &format!("{} - ", artist.name);
+                                            }
                                         }
-                                    }
 
-                                    message += &track.name;
-                                    message
-                                }
-                                _ => String::from(
-                                    "no song, I'm just listening to Folding@Home podcast :)",
-                                ),
+                                        message += &track.name;
+                                        message
+                                    }
+                                    _ => String::from(
+                                        "no song, I'm just listening to Folding@Home podcast :)",
+                                    ),
+                                },
+                                None => String::from("Error: No song is currently playing."),
                             },
                             None => String::from("Error: No song is currently playing."),
                         },
-                        None => String::from("Error: No song is currently playing."),
-                    },
-                    Err(err) => {
-                        println!("Error when getting the song: {:?}", err);
-                        String::from("Error: Couldn't get the current song.")
-                    }
-                };
+                        Err(err) => {
+                            println!("Error when getting the song: {:?}", err);
+                            String::from("Error: Couldn't get the current song.")
+                        }
+                    };
 
-                let _ = self
-                    .sender
-                    .send(TwitchFmt::privmsg(&message, &self.channel))
-                    .await;
+                    let _ = self
+                        .sender
+                        .send(TwitchFmt::privmsg(&message, &self.channel))
+                        .await;
+                }
             }
             #[cfg(feature = "audio")]
             "internal:cancel" => {
