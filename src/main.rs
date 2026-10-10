@@ -410,7 +410,10 @@ impl IRCBotClient {
             // Ok, maybe we can do some custom greets.
             let ug = format!("USER_GREET_{}", &user);
             let name2 = pd.name().clone();
-            if user == "pacmanmvc" && cmd.contains("opper") {
+            if pd.sent_messages <= 1 {
+                println!("First time chatter - not greeting.");
+            }
+            else if user == "pacmanmvc" && cmd.contains("opper") {
                 send_msg(&"Good day, PacManner.".to_string()).await;
             } else if has_responses(&ug) && thread_rng().gen_bool(3.0 / response_mod) {
                 println!(
